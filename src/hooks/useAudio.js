@@ -1,15 +1,29 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback, useMemo } from 'react';
 
 export function useAudio() {
     const audioContextRef = useRef(null);
     const oscillatorRef = useRef(null);
 
+    // Define stop first so it can be used in useEffect and play
+    const stop = useCallback(() => {
+        if (audioContextRef.current) {
+            if (audioContextRef.current.loopId) {
+                clearInterval(audioContextRef.current.loopId);
+            }
+            // Check state before closing to avoid errors
+            if (audioContextRef.current.state !== 'closed') {
+                audioContextRef.current.close().catch(e => console.error(e));
+            }
+            audioContextRef.current = null;
+        }
+    }, []);
+
     useEffect(() => {
         // Initialize AudioContext on user interaction if needed, usually best done lazily
         return () => stop();
-    }, []);
+    }, [stop]);
 
-    const play = () => {
+    const play = useCallback(() => {
         stop(); // Ensure any previous sound is stopped
 
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -41,9 +55,6 @@ export function useAudio() {
 
         // Loop the beep
         const loopInterval = setInterval(() => {
-            // We can trigger another beep here if we want a repeating alarm pattern
-            // But simpler to just let the oscillator run if we want continuous tone, 
-            // For a beep-beep-beep we need to schedule it.
             scheduleBeep(ctx);
         }, 1000);
 
@@ -69,25 +80,8 @@ export function useAudio() {
             o.stop(now + 0.3);
         };
 
-        // Store interval to clear
-        osc.onended = () => {
-            // This only fires when the specific oscillator node ends
-        };
-
-        // Actually, let's keep it simple: An infinite loop of beeps
-        // We need to return a cleanup function or handle state
         audioContextRef.current.loopId = loopInterval;
-    };
+    }, [stop]);
 
-    const stop = () => {
-        if (audioContextRef.current) {
-            if (audioContextRef.current.loopId) {
-                clearInterval(audioContextRef.current.loopId);
-            }
-            audioContextRef.current.close();
-            audioContextRef.current = null;
-        }
-    };
-
-    return { play, stop };
+    return useMemo(() => ({ play, stop }), [play, stop]);
 }

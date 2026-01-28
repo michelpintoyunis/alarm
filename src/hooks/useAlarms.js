@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getAlarms, saveAlarm, deleteAlarm } from '../db';
 
 export function useAlarms() {
@@ -20,28 +20,33 @@ export function useAlarms() {
         }
     }
 
-    async function addAlarm(alarm) {
+    const addAlarm = useCallback(async (alarm) => {
         const newAlarm = { ...alarm, id: Date.now(), enabled: true };
         await saveAlarm(newAlarm);
         setAlarms(prev => [...prev, newAlarm]);
-    }
+    }, []);
 
-    async function updateAlarm(updatedAlarm) {
+    const updateAlarm = useCallback(async (updatedAlarm) => {
         await saveAlarm(updatedAlarm);
         setAlarms(prev => prev.map(a => a.id === updatedAlarm.id ? updatedAlarm : a));
-    }
+    }, []);
 
-    async function removeAlarm(id) {
+    const removeAlarm = useCallback(async (id) => {
         await deleteAlarm(id);
         setAlarms(prev => prev.filter(a => a.id !== id));
-    }
+    }, []);
 
-    async function toggleAlarm(id) {
-        const alarm = alarms.find(a => a.id === id);
-        if (alarm) {
-            await updateAlarm({ ...alarm, enabled: !alarm.enabled });
-        }
-    }
+    const toggleAlarm = useCallback(async (id) => {
+        setAlarms(prev => {
+            const alarm = prev.find(a => a.id === id);
+            if (alarm) {
+                const updated = { ...alarm, enabled: !alarm.enabled };
+                saveAlarm(updated); // Side effect inside setter is not ideal but works for async persistence trigger
+                return prev.map(a => a.id === id ? updated : a);
+            }
+            return prev;
+        });
+    }, []);
 
     return { alarms, loading, addAlarm, updateAlarm, removeAlarm, toggleAlarm };
 }
