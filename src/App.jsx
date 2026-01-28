@@ -17,18 +17,18 @@ function App() {
   const audio = useAudio();
 
   // Check for alarm triggers
+  const [dismissedTime, setDismissedTime] = useState(null);
+
   useEffect(() => {
     const nowString = currentTime.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
-    const nowSeconds = currentTime.getSeconds();
 
-    // Check only at the start of the minute (00 seconds) to avoid multiple triggers
-    // Or check continuously but ensure we don't re-trigger. 
-    // Since our resolution is 1 second, we should just check if any enabled alarm matches now
-    // AND it hasn't been dismissed recently?
-    // Simplify: Trigger if matches. "Ringing" state prevents re-trigger.
+    // Reset dismissed state if critical minute has passed
+    if (dismissedTime && dismissedTime !== nowString) {
+      setDismissedTime(null);
+    }
 
     if (ringingAlarm) return;
-    if (nowSeconds !== 0) return; // Only trigger at :00 seconds to be precise
+    if (dismissedTime === nowString) return; // Prevent re-triggering in the same minute
 
     const match = alarms.find(a => a.enabled && a.time === nowString);
     if (match) {
@@ -37,10 +37,15 @@ function App() {
 
       // Send notification
       if (Notification.permission === 'granted') {
-        new Notification('Alarm', { body: match.label || 'Time to wake up!', icon: '/pwa-192x192.png' });
+        new Notification('Alarm', {
+          body: match.label || 'Time to wake up!',
+          icon: '/pwa-192x192.png',
+          requireInteraction: true,
+          vibrate: [200, 100, 200]
+        });
       }
     }
-  }, [currentTime, alarms, ringingAlarm, audio]);
+  }, [currentTime, alarms, ringingAlarm, audio, dismissedTime]);
 
   // Request notification permission
   useEffect(() => {
@@ -62,11 +67,12 @@ function App() {
   const handleDismiss = () => {
     setRingingAlarm(null);
     audio.stop();
+    // Record that we dismissed the alarm for this specific time
+    const nowString = currentTime.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+    setDismissedTime(nowString);
   };
 
   const handleSnooze = () => {
-    // Simple snooze: Just stop for now, maybe set a new one for +5 mins?
-    // For MVP, just dismiss
     handleDismiss();
   };
 
