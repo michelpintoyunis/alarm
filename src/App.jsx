@@ -37,12 +37,17 @@ function App() {
 
       // Send notification
       if (Notification.permission === 'granted') {
-        new Notification('Alarm', {
+        const notification = new Notification('Alarm', {
           body: match.label || 'Time to wake up!',
           icon: '/pwa-192x192.png',
           requireInteraction: true,
           vibrate: [200, 100, 200]
         });
+
+        notification.onclick = function () {
+          window.focus();
+          this.close();
+        };
       }
     }
   }, [currentTime, alarms, ringingAlarm, audio, dismissedTime]);
